@@ -8,7 +8,7 @@ from django.conf import settings
 from enable_disable.tasks import get_metadata, deploy_metadata
 from suds.client import Client
 import uuid
-import json	
+import json
 import requests
 import datetime
 from time import sleep
@@ -17,7 +17,7 @@ reload(sys)
 sys.setdefaultencoding("utf-8")
 
 def index(request):
-	
+
 	if request.method == 'POST':
 
 		login_form = LoginForm(request.POST)
@@ -31,7 +31,7 @@ def index(request):
 				oauth_url = 'https://test.salesforce.com/services/oauth2/authorize'
 
 			oauth_url = oauth_url + '?response_type=code&client_id=' + settings.SALESFORCE_CONSUMER_KEY + '&redirect_uri=' + settings.SALESFORCE_REDIRECT_URI + '&state='+ environment
-			
+
 			return HttpResponseRedirect(oauth_url)
 	else:
 		login_form = LoginForm()
@@ -58,7 +58,7 @@ def oauth_response(request):
 			login_url = 'https://login.salesforce.com'
 		else:
 			login_url = 'https://test.salesforce.com'
-		
+
 		r = requests.post(login_url + '/services/oauth2/token', headers={ 'content-type':'application/x-www-form-urlencoded'}, data={'grant_type':'authorization_code','client_id': settings.SALESFORCE_CONSUMER_KEY,'client_secret':settings.SALESFORCE_CONSUMER_SECRET,'redirect_uri': settings.SALESFORCE_REDIRECT_URI,'code': oauth_code})
 		auth_response = json.loads(r.text)
 
@@ -81,7 +81,7 @@ def oauth_response(request):
 			r = requests.get(instance_url + '/services/data/v' + str(settings.SALESFORCE_API_VERSION) + '.0/sobjects/Organization/' + org_id + '?fields=Name', headers={'Authorization': 'OAuth ' + access_token})
 			org_name = json.loads(r.text)['Name']
 
-		login_form = LoginForm(initial={'environment': environment, 'access_token': access_token, 'instance_url': instance_url, 'org_id': org_id, 'username': username, 'org_name':org_name})	
+		login_form = LoginForm(initial={'environment': environment, 'access_token': access_token, 'instance_url': instance_url, 'org_id': org_id, 'username': username, 'org_name':org_name})
 
 	# Run after user selects logout or get schema
 	if request.POST:
@@ -127,7 +127,7 @@ def logout(request):
 
 	# Determine logout url based on environment
 	instance_prefix = request.GET.get('instance_prefix')
-		
+
 	return render_to_response('logout.html', RequestContext(request, {'instance_prefix': instance_prefix}))
 
 # AJAX endpoint for page to constantly check if job is finished
@@ -159,13 +159,13 @@ def loading(request, job_id):
 		return HttpResponseRedirect(return_url)
 
 	else:
-		
-		return render_to_response('loading.html', RequestContext(request, {'job': job}))	
+
+		return render_to_response('loading.html', RequestContext(request, {'job': job}))
 
 def job(request, job_id):
 	"""
 	Controller to page that displays metadata components
-	
+
 	"""
 
 	job = get_object_or_404(Job, random_id = job_id)
@@ -174,7 +174,7 @@ def job(request, job_id):
 	val_object_names = []
 	for val_rule in job.validation_rules():
 		val_object_names.append(val_rule.object_name)
-		
+
 	# Make a unique list
 	val_object_names = list(set(val_object_names))
 	val_object_names.sort()
@@ -183,17 +183,17 @@ def job(request, job_id):
 	wf_object_names = []
 	for workflow_rule in job.workflow_rules():
 		wf_object_names.append(workflow_rule.object_name)
-		
+
 	# make a unique list
 	wf_object_names = list(set(wf_object_names))
 	wf_object_names.sort()
 
 
 	return render_to_response('job.html', RequestContext(request, {
-		'job': job, 
-		'val_object_names': val_object_names, 
+		'job': job,
+		'val_object_names': val_object_names,
 		'val_rules': job.validation_rules(),
-		'wf_object_names': wf_object_names, 
+		'wf_object_names': wf_object_names,
 		'wf_rules': job.workflow_rules(),
 		'triggers': job.triggers(),
 		'flows': job.flows()
@@ -292,7 +292,7 @@ def auth_details(request):
 			job.access_token = request_data['access_token']
 			job.save()
 
-			# Attempt to get username and org name. 
+			# Attempt to get username and org name.
 			try:
 
 				# get the org name of the authenticated user
@@ -307,9 +307,9 @@ def auth_details(request):
 			# Run job
 			get_metadata.delay(job)
 
-			# Build response 
+			# Build response
 			response_data = {
-				'job_url': 'https://sfswitch.herokuapp.com/loading/' + str(job.random_id) + '/?noheader=1',
+				'job_url': 'https://sfswitch-gc.herokuapp.com/loading/' + str(job.random_id) + '/?noheader=1',
 				'status': 'Success',
 				'success': True
 			}
@@ -322,5 +322,5 @@ def auth_details(request):
 			'success':  False,
 			'error_text': str(error)
 		}
-	
+
 	return HttpResponse(json.dumps(response_data), content_type = 'application/json')

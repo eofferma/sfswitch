@@ -24,15 +24,15 @@ app = Celery('tasks', broker=os.environ.get('REDISTOGO_URL', 'redis://localhost'
 from enable_disable.models import Job, ValidationRule, WorkflowRule, ApexTrigger, Flow, DeployJob, DeployJobComponent
 
 @app.task
-def get_metadata(job): 
-	
+def get_metadata(job):
+
 	job.status = 'Downloading Metadata'
 	job.save()
 
 	try:
 
 		# instantiate the metadata WSDL
-		metadata_client = Client('http://sfswitch.herokuapp.com/static/metadata-' + str(settings.SALESFORCE_API_VERSION) + '.xml')
+		metadata_client = Client('http://sfswitch-gc.herokuapp.com/static/metadata-' + str(settings.SALESFORCE_API_VERSION) + '.xml')
 
 		# URL for metadata API
 		metadata_url = job.instance_url + '/services/Soap/m/' + str(settings.SALESFORCE_API_VERSION) + '.0/' + job.org_id
@@ -191,7 +191,7 @@ def get_metadata(job):
 		# And the Tooling SOAP API I couldn't get working
 		request_url = job.instance_url + '/services/data/v' + str(settings.SALESFORCE_API_VERSION) + '.0/tooling/'
 		request_url += 'query/?q=Select+Id,ActiveVersion.VersionNumber,LatestVersion.VersionNumber,FullName+From+FlowDefinition'
-		headers = { 
+		headers = {
 			'Accept': 'application/json',
 			'X-PrettyPrint': 1,
 			'Authorization': 'Bearer ' + job.access_token
@@ -239,7 +239,7 @@ def get_metadata(job):
 				trigger_to_retrieve.members = trigger
 				trigger_to_retrieve.name = 'ApexTrigger'
 				trigger_retrieve_list.append(trigger_to_retrieve)
-			
+
 			package_to_retrieve = metadata_client.factory.create('Package')
 			package_to_retrieve.apiAccessLevel = None
 			package_to_retrieve.types = trigger_retrieve_list
@@ -292,7 +292,7 @@ def get_metadata(job):
 					try:
 
 						if '-meta.xml' not in filename.split('/')[1]:
-							
+
 							trigger = ApexTrigger()
 							trigger.job = job
 							trigger.name = filename.split('/')[1][:-8]
@@ -326,7 +326,7 @@ def get_metadata(job):
 			job.status = 'Finished'
 
 	except Exception as error:
-		
+
 		job.status = 'Error'
 		job.error = traceback.format_exc()
 
@@ -335,13 +335,13 @@ def get_metadata(job):
 
 
 @app.task
-def deploy_metadata(deploy_job): 
+def deploy_metadata(deploy_job):
 
 	deploy_job.status = 'Deploying'
 	deploy_job.save()
 
 	# Set up metadata API connection
-	metadata_client = Client('http://sfswitch.herokuapp.com/static/metadata-34.xml')
+	metadata_client = Client('http://sfswitch-gc.herokuapp.com/static/metadata-34.xml')
 	metadata_url = deploy_job.job.instance_url + '/services/Soap/m/' + str(settings.SALESFORCE_API_VERSION) + '.0/' + deploy_job.job.org_id
 	metadata_client.set_options(location = metadata_url)
 	session_header = metadata_client.factory.create("SessionHeader")
@@ -415,7 +415,7 @@ def deploy_metadata(deploy_job):
 			# Deploy flows using REST API
 			# SOAP API doesn't support an easy update
 			request_url = deploy_job.job.instance_url + '/services/data/v' + str(settings.SALESFORCE_API_VERSION) + '.0/tooling/sobjects/FlowDefinition/'
-			headers = { 
+			headers = {
 				'Accept': 'application/json',
 				'X-PrettyPrint': 1,
 				'Authorization': 'Bearer ' + deploy_job.job.access_token,
@@ -463,7 +463,7 @@ def deploy_metadata(deploy_job):
 			os.mkdir('triggers')
 
 			zip_file = ZipFile('deploy.zip', 'w')
-		
+
 			for deploy_component in deploy_components:
 
 				trigger_file = open('triggers/' + deploy_component.trigger.name + '.trigger','w+')
@@ -503,7 +503,7 @@ def deploy_metadata(deploy_job):
 			deploy_options = metadata_client.factory.create('DeployOptions')
 			deploy_options.allowMissingFiles = True
 			deploy_options.autoUpdatePackage = True
-			deploy_options.checkOnly = False 
+			deploy_options.checkOnly = False
 			deploy_options.ignoreWarnings = True
 			deploy_options.performRetrieve = False
 			deploy_options.purgeOnDelete = False
@@ -574,4 +574,3 @@ def deploy_metadata(deploy_job):
 		deploy_job.error = error
 
 	deploy_job.save()
-	
